@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import matplotlib
 import io
 import urllib, base64
+from openai import OpenAI
+import numpy as np
+import os
+from dotenv import load_dotenv
 
 def home(request):
     #return HttpResponse('<h1>Welcome to Home Page</h1>')
@@ -19,6 +23,30 @@ def home(request):
         movies = Movie.objects.all()
     return render(request, 'home.html', {'searchTerm':searchTerm, 'movies':movies})
 
+def recomendations(request):
+    load_dotenv(os.path.join(os.path.dirname(__file__), '../../openAI.env'))
+    client = OpenAI(api_key=os.environ.get('openai_apikey'))
+    prompt = request.GET.get('searchMovie', '')
+    recommended_movies = []
+    searchTerm = prompt
+    if prompt:
+        # Generate embedding for the prompt
+        response = client.embeddings.create(
+            input=[prompt],
+            model="text-embedding-3-small"
+        )
+        prompt_emb = np.array(response.data[0].embedding, dtype=np.float32)
+        # Calculate similarity for each movie
+        similarities = []
+        for movie in Movie.objects.all():
+            if movie.emb:
+                movie_emb = np.frombuffer(movie.emb, dtype=np.float32)
+                similarity = np.dot(prompt_emb, movie_emb) / (np.linalg.norm(prompt_emb) * np.linalg.norm(movie_emb))
+                similarities.append((similarity, movie))
+        # Sort movies by similarity and get top 5
+        similarities.sort(reverse=True, key=lambda x: x[0])
+        recommended_movies = [m for _, m in similarities[:5]]
+    return render(request, 'recomendations.html', {'searchTerm': searchTerm, 'movies': recommended_movies})
 
 def about(request):
     #return HttpResponse('<h1>Welcome to About Page</h1>')
@@ -123,3 +151,4 @@ def generate_bar_chart(data, xlabel, ylabel):
     buffer.close()
     graphic = base64.b64encode(image_png).decode('utf-8')
     return graphic
+

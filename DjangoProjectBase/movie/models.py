@@ -2,6 +2,10 @@ from django.db import models
 import numpy as np
 # create your models here
 
+def get_default_array():
+    default_arr = np.random.rand(1536)
+    return default_arr.tobytes()
+
 class Movie(models.Model): 
     title = models.CharField(max_length=100)
     description = models.CharField(max_length=250) 
